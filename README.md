@@ -59,15 +59,15 @@ Damit alle Funktionen reibungslos laufen, sollten folgende Tools installiert sei
     npm install
     ```
 
-🚀 CI Mode & Automation
+# 🚀 CI Mode & Automation
 Cody Loom verfügt über einen Headless-Modus für die Integration in CI/CD-Pipelines. In diesem Modus scannt die Anwendung das Zielprojekt,
 generiert einen Report und beendet sich mit einem entsprechenden Exit-Code.
 
-# 1. Anwendung bauen  
+## 1. Anwendung bauen  
 npm run tauri build
 
-# 2. Scan im CI-Modus ausführen
-## Der Befehl erstellt automatisch einen /reports Ordner mit der sbom.json
+## 2. Scan im CI-Modus ausführen
+### Der Befehl erstellt automatisch einen /reports Ordner mit der sbom.json
 
 ./target/release/eit-cody-loom --ci --scan /path/to/project
 
