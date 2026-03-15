@@ -6,7 +6,9 @@ use std::process::Command;
 use roxmltree::Document;
 use tauri::command;
 
-#[derive(Serialize, Deserialize, Debug)]
+/// Repräsentiert eine einzelne Maven-Abhängigkeit.
+/// Wird sowohl für die UI-Anzeige als auch für die SBOM-Generierung genutzt.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DependencyInfo {
     pub module_name: String,
     pub group_id: String,
@@ -16,6 +18,7 @@ pub struct DependencyInfo {
     pub vulnerabilities: Vec<Vulnerability>,
 }
 
+/// Struktur für eine gefundene Sicherheitslücke (aus der OSV-Datenbank).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Vulnerability {
     pub id: String,
@@ -24,6 +27,7 @@ pub struct Vulnerability {
     pub severity: String,
 }
 
+// Interne Strukturen für das Deserialisieren der OSV API-Antworten.
 #[derive(Deserialize)]
 struct OsvResponse {
     vulns: Option<Vec<OsvVuln>>,
@@ -36,7 +40,13 @@ struct OsvVuln {
     details: Option<String>,
 }
 
+/// Sucht rekursiv nach allen `pom.xml` Dateien in einem Verzeichnis.
+///
+/// # Argumente
+/// * `dir` - Das Startverzeichnis.
+/// * `poms` - Ein mutabler Vektor, der die gefundenen Dateipfade sammelt.
 fn find_poms(dir: &Path, poms: &mut Vec<PathBuf>) {
+    // Rekursives Durchsuchen des Dateisystems
     let _ = if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -55,12 +65,22 @@ fn find_poms(dir: &Path, poms: &mut Vec<PathBuf>) {
     } else { false };
 }
 
+/// Hauptfunktion zum Scannen eines Maven-Projekts auf Abhängigkeiten und Lücken.
+///
+/// Diese Funktion nutzt eine zweistufige Strategie:
+/// 1. **Maven CLI (`mvn dependency:list`)**: Versucht, den exakten Dependency-Tree 
+///    inklusive transitiver Abhängigkeiten aufzulösen.
+/// 2. **Statisches XML Parsing (Fallback)**: Falls Maven fehlschlägt, werden die 
+///    `pom.xml` Dateien manuell geparst (ohne transitive Auflösung).
+/// Anschließend werden alle gefundenen Versionen gegen die OSV-API und Maven Central geprüft.
 #[command]
 pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyInfo>, String> {
+    // Map zur Deduplizierung von Abhängigkeiten (Modul | Group:Artifact als Key)
     let mut dependencies_map = HashMap::new();
     let mut maven_success = false;
 
-    // 1. Versuch: Der Host-System Maven Cheat (Transitive Dependencies auflösen)
+    // --- STUFE 1: Der Host-System Maven Cheat ---
+    // Führt Maven aus, um den echten, aufgelösten Baum zu bekommen.
     let mvn_output = Command::new("mvn")
         .args(["dependency:list", "-B", "-f", &file_path])
         .output();
@@ -71,21 +91,23 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
             let stdout = String::from_utf8_lossy(&output.stdout);
             let mut current_module = "root".to_string();
 
+            // Parst den Maven-Output Zeile für Zeile
             for line in stdout.lines() {
                 let trimmed = line.trim();
                 
+                // Erkennt Modul-Wechsel im Multi-Module Build
                 let _ = if trimmed.starts_with("[INFO] Building ") {
                     current_module = trimmed.replace("[INFO] Building ", "").split(' ').next().unwrap_or("root").to_string();
                     true
                 } else if trimmed.starts_with("[INFO]") && trimmed.chars().filter(|c| *c == ':').count() >= 4 {
-                    // Parsen der Zeile: [INFO]    groupId:artifactId:type:version:scope
+                    // Extrahiert die Komponenten: groupId:artifactId:type:version:scope
                     let dep_str = trimmed.replace("[INFO]", "").trim().to_string();
                     let parts: Vec<&str> = dep_str.split(':').collect();
 
                     let _ = if parts.len() >= 5 {
                         let group_id = parts[0].trim();
                         let artifact_id = parts[1].trim();
-                        // Version ist immer das vorletzte Element (egal ob Classifier dazwischen ist oder nicht)
+                        // Version ist immer das vorletzte Element, unabhängig vom Scope oder Classifier
                         let version = parts[parts.len() - 2].trim();
                         
                         let dep_key = format!("{}:{}", group_id, artifact_id);
@@ -109,7 +131,8 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
         true
     } else { false };
 
-    // 2. Fallback: Reines XML Static-Parsing (falls Maven fehlt oder fehlschlägt)
+    // --- STUFE 2: XML Static-Parsing Fallback ---
+    // Wird nur ausgeführt, wenn Maven nicht installiert ist oder fehlschlägt.
     let _ = if !maven_success || dependencies_map.is_empty() {
         let root_path = Path::new(&file_path);
         let search_dir = if root_path.is_dir() { root_path } else { root_path.parent().unwrap_or(Path::new("")) };
@@ -117,10 +140,12 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
         let mut pom_files = Vec::new();
         find_poms(search_dir, &mut pom_files);
 
+        // Sammelt Properties und DependencyManagement für die Versionsauflösung
         let mut properties = HashMap::new();
         let mut managed_deps = HashMap::new();
         let mut parsed_docs = Vec::new();
 
+        // Erster Pass: Sammle alle globalen Definitionen
         for pom_path in &pom_files {
             let module_name = pom_path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("root").to_string();
 
@@ -151,6 +176,7 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
             } else { false };
         }
 
+        // Zweiter Pass: Tatsächliche Dependencies auflösen
         for (module_name, content) in &parsed_docs {
             let doc = Document::parse(content).unwrap();
             
@@ -163,6 +189,7 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
                     let dep_key = format!("{}:{}", group_id, artifact_id);
                     let map_key = format!("{}|{}", module_name, dep_key);
                     
+                    // Versuche, fehlende Versionen durch Dependency Management oder Properties zu ersetzen
                     let resolved_managed = if raw_version.is_empty() { managed_deps.get(&dep_key).map(|s| s.as_str()).unwrap_or("unknown") } else { raw_version };
                     let final_version = if resolved_managed.starts_with("${") && resolved_managed.ends_with("}") {
                         let prop_key = &resolved_managed[2..resolved_managed.len() - 1];
@@ -184,13 +211,14 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
         true
     } else { false };
 
-    // 3. Vulnerability und Latest Version Check (Gilt für Maven-Output UND Fallback gleichermaßen)
+    // --- STUFE 3: OSV API & Maven Central Prüfung ---
     let dependencies: Vec<DependencyInfo> = dependencies_map.into_values().collect();
     let client = reqwest::Client::new();
     let mut results = Vec::new();
 
     for mut dep in dependencies {
         let _ = if dep.version != "unknown" {
+            // 1. Check OSV auf Lücken
             let osv_query = serde_json::json!({
                 "version": dep.version,
                 "package": {
@@ -219,6 +247,7 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
             true
         } else { false };
 
+        // 2. Check Maven Central nach der neuesten Version
         let maven_url = format!("https://search.maven.org/solrsearch/select?q=g:{} AND a:{}&rows=1&wt=json", dep.group_id, dep.artifact_id);
         
         let _ = if let Ok(resp) = client.get(&maven_url).send().await {
@@ -238,12 +267,21 @@ pub async fn check_pom_dependencies(file_path: String) -> Result<Vec<DependencyI
     Ok(results)
 }
 
+/// Generiert ein Software Bill of Materials (SBOM) im CycloneDX Format.
+///
+/// # Argumente
+/// * `dependencies` - Liste der gescannten Abhängigkeiten (inkl. gefundenen Lücken).
+/// * `save_path` - Der absolute oder relative Pfad, wo die JSON gespeichert werden soll.
+///
+/// Schreibt eine CycloneDX 1.5 kompatible JSON-Datei, die von Security-Dashboards
+/// wie Dependency-Track gelesen werden kann.
 #[command]
 pub async fn generate_cyclonedx_sbom(dependencies: Vec<DependencyInfo>, save_path: String) -> Result<String, String> {
     let mut components = Vec::new();
     let mut vulnerabilities = Vec::new();
 
     for dep in dependencies {
+        // PURL (Package URL) ist der Standard-Identifier im CycloneDX Ökosystem
         let purl = format!("pkg:maven/{}/{}@{}", dep.group_id, dep.artifact_id, dep.version);
 
         components.push(serde_json::json!({
@@ -255,6 +293,8 @@ pub async fn generate_cyclonedx_sbom(dependencies: Vec<DependencyInfo>, save_pat
             "purl": &purl
         }));
 
+        // Falls Lücken existieren, werden diese als separates Array mit Referenz 
+        // zur betroffenen Komponente (bom-ref) verknüpft.
         if !dep.vulnerabilities.is_empty() {
             for vuln in dep.vulnerabilities {
                 vulnerabilities.push(serde_json::json!({
@@ -270,6 +310,7 @@ pub async fn generate_cyclonedx_sbom(dependencies: Vec<DependencyInfo>, save_pat
         }
     }
 
+    // Zusammensetzen des finalen JSON-Baums
     let sbom = serde_json::json!({
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
