@@ -59,6 +59,52 @@ Damit alle Funktionen reibungslos laufen, sollten folgende Tools installiert sei
     npm install
     ```
 
+🚀 CI Mode & Automation
+Cody Loom verfügt über einen Headless-Modus für die Integration in CI/CD-Pipelines. In diesem Modus scannt die Anwendung das Zielprojekt,
+generiert einen Report und beendet sich mit einem entsprechenden Exit-Code.
+
+# 1. Anwendung bauen  
+npm run tauri build
+
+# 2. Scan im CI-Modus ausführen
+# Der Befehl erstellt automatisch einen /reports Ordner mit der sbom.json
+./target/release/eit-cody-loom --ci --scan /path/to/project
+
+
+## Beispiel GitHub Actions Workflow
+```
+name: Security Scan
+on: [push]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          
+      - name: Maven Build
+        run: mvn clean compile -B
+
+      - name: Run Cody Loom
+        run: |
+          chmod +x ./bin/eit-cody-loom
+          ./bin/eit-cody-loom --ci --scan ./
+          
+      - name: Archive Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: reports/
+
+```
+
 ### Ausführen
 
 **Development Mode**: (Frontend & Backend parallel)
