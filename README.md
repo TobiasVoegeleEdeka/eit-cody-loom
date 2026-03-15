@@ -72,7 +72,7 @@ npm run tauri build
 ./target/release/eit-cody-loom --ci --scan /path/to/project
 
 ### wenn noch nicht gebaut: 
-cargo run -- --ci --scan "C:\development\eit-cody-sentinel"
+cargo run -- --ci --scan /path/to/project
 
 
 ## Beispiel GitHub Actions Workflow
