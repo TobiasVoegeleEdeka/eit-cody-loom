@@ -67,8 +67,12 @@ generiert einen Report und beendet sich mit einem entsprechenden Exit-Code.
 npm run tauri build
 
 # 2. Scan im CI-Modus ausführen
-# Der Befehl erstellt automatisch einen /reports Ordner mit der sbom.json
+## Der Befehl erstellt automatisch einen /reports Ordner mit der sbom.json
+
 ./target/release/eit-cody-loom --ci --scan /path/to/project
+
+### wenn noch nicht gebaut: 
+cargo run -- --ci --scan "C:\development\eit-cody-sentinel"
 
 
 ## Beispiel GitHub Actions Workflow
