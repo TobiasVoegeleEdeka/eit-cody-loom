@@ -23,7 +23,7 @@ use std::path::Path;
 ///    - Gibt `1` zurück, wenn Schwachstellen gefunden wurden oder ein Fehler auftrat.
 pub fn run_ci(args: Vec<String>) {
     // Ermittelt den Zielpfad anhand des --scan Flags. 
-    // Nutzt Rusts if-else Expressions als Ternary-Äquivalent für saubere Zuweisung.
+    // saubere Zuweisung mit if-else Expressions
     let scan_idx = args.iter().position(|r| r == "--scan");
     let path = if let Some(idx) = scan_idx {
         if args.len() > idx + 1 { args[idx + 1].clone() } else { ".".to_string() }
