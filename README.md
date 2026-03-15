@@ -72,7 +72,7 @@ npm run tauri dev
 cd frontend
 npm run tauri build
 ```
-Die fertige `.exe` (oder das entsprechende OS-Paket) findest man anschließend unter `src-tauri/target/release/bundle/`.
+Die fertige `.exe` (oder das entsprechende OS-Paket) findet man anschließend unter `src-tauri/target/release/bundle/`.
 
 ---
 
