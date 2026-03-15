@@ -9,7 +9,6 @@ pub fn run_ci(args: Vec<String>) {
         if args.len() > idx + 1 { args[idx + 1].clone() } else { ".".to_string() }
     } else { ".".to_string() };
 
-    // Ordner "reports" sicherstellen
     let report_dir = "reports";
     let _ = if !Path::new(report_dir).exists() {
         fs::create_dir_all(report_dir).expect("Konnte Report-Ordner nicht erstellen")
@@ -17,34 +16,32 @@ pub fn run_ci(args: Vec<String>) {
 
     let sbom_path = format!("{}/sbom.json", report_dir);
 
-    println!("🔍 Cody Loom: Analysiere Projekt unter: {}", path);
+    println!("\n{}", "=".repeat(60));
+    println!("🚀 CODY LOOM | SECURITY PIPELINE");
+    println!("{}", "=".repeat(60));
+    println!("Target: {}", path);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let exit_code = rt.block_on(async {
-        let deps_result = check_pom_dependencies(path).await;
-        
-        match deps_result {
+    let (exit_code, message) = rt.block_on(async {
+        match check_pom_dependencies(path).await {
             Ok(deps) => {
                 let has_vulns = deps.iter().any(|d| !d.vulnerabilities.is_empty());
                 
                 let _ = generate_cyclonedx_sbom(deps, sbom_path).await;
                 
-                println!("📄 SBOM wurde im Ordner '{}' gespeichert.", report_dir);
-
                 if has_vulns {
-                    println!("🚨 CI-Check fehlgeschlagen: Sicherheitslücken gefunden!");
-                    1
+                    (1, "❌ STATUS: CRITICAL - Vulnerabilities detected!")
                 } else {
-                    println!("✅ CI-Check bestanden.");
-                    0
+                    (0, "✅ STATUS: SUCCESS - No vulnerabilities found.")
                 }
             }
-            Err(e) => {
-                println!("❌ Kritischer Fehler beim Scan: {}", e);
-                1
-            }
+            Err(_) => (1, "❌ STATUS: ERROR - Scan failed.")
         }
     });
+
+    println!("{}", message);
+    println!("Report: reports/sbom.json");
+    println!("{}\n", "=".repeat(60));
 
     exit(exit_code);
 }
