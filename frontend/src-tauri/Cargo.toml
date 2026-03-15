@@ -28,3 +28,5 @@ tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.7", features = ["v4"] }
 reqwest = { version = "0.12", features = ["json"] }
 roxmltree = "0.20"
+sqlparser = "0.43"
+yaml-rust = "0.4"

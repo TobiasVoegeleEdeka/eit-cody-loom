@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { from, Observable } from 'rxjs';
 
+
 export interface HelmMapping {
   key: String;
   env_var: String;
@@ -10,6 +11,7 @@ export interface HelmMapping {
 }
 
 export interface DependencyInfo {
+  module_name: string;
   group_id: string;
   artifact_id: string;
   version: string;
@@ -73,4 +75,23 @@ export class TauriService {
   readTextFile(path: string): Observable<string> {
     return from(invoke<string>('read_text_file', { path }));
   }
+
+  generateSbom(dependencies: DependencyInfo[], savePath: string): Observable<string> {
+    return from(invoke<string>('generate_cyclonedx_sbom', { dependencies, savePath }));
+  }
+
+
+
+
+  async selectDirectory(title: string): Promise<string | null> {
+    const selected = await open({
+      title: title,
+      directory: true,
+      multiple: false
+    });
+
+    return selected ? (Array.isArray(selected) ? selected[0] : selected) : null;
+  }
+
+
 }
