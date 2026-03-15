@@ -1,61 +1,79 @@
-# eit-cody-loom
-config property helm chart generator
+# 🧶 EIT Cody Loom
 
-# Cody Loom
+**EIT Cody Loom** ist ein Schweizer Taschenmesser für die moderne Java-Entwicklung. Es automatisiert mühsame Aufgaben in der Infrastruktur-Vorbereitung, von der Datenbank-Migration bis hin zur Sicherheitsanalyse von Abhängigkeiten.
 
-Diese Applikation generiert Liquibase-Changelogs aus SQL-Dumps oder DDL-Skripten und bietet eine "Bridge" für Java-Properties (Spring/Quarkus) zu Helm-Charts.
+---
 
-## Features
+## 🚀 Kern-Features
 
-- **SQL to Liquibase**: Konvertiert SQL-Dumps in Liquibase YAML/XML.
-- **DDL to Liquibase**: Erstellt Changelogs direkt aus DDL-Statements.
-- **Helm Generator**: Übersetzt `application.properties` in Helm `values.yaml` und Kubernetes Env-Variable Mappings.
-- **Docker Check**: Prüft, ob Docker für die Liquibase-Konvertierung bereitsteht.
+### 🛠️ Liquibase Helper
+*   **SQL to Liquibase**: Transformiert rohe SQL-Dumps in strukturierte Liquibase ChangeLogs (YAML/XML).
+*   **DDL to Liquibase**: Erstellt Migrationsskripte direkt aus DDL-Statements.
+*   **Docker Integration**: Nutzt temporäre Container, um hochpräzise Diff-Analysen durchzuführen.
 
-## Voraussetzungen
+### ☸️ Helm Bridge
+*   **Property Translator**: Übersetzt Java `application.properties` (Spring Boot / Quarkus) direkt in Helm `values.yaml`.
+*   **Env Mapping**: Generiert automatisch die notwendigen Kubernetes Umgebungsvariablen-Mappings für Deployment-Snippets.
 
-- **Docker Desktop**: Muss laufen (für temporäre Postgres-Instanz via Liquibase).
-- **Liquibase CLI**: Muss im System PATH installiert sein.
+### 🛡️ Dependency Health Check (NEU)
+*   **Deep Scan**: Analysiert Maven-Projekte (`pom.xml`) und löst transitive Abhängigkeiten über das lokale Maven-System auf.
+*   **Sicherheits-Check**: Gleicht alle Abhängigkeiten in Echtzeit mit der **OSV.dev (Google Security) Database** ab.
+*   **Update-Radar**: Findet die absolut neuesten Versionen auf Maven Central.
+*   **SBOM Export**: Generiert standardkonforme **CycloneDX SBOMs** (Software Bill of Materials) für Compliance-Zwecke.
 
-## Installation & Entwicklung
+---
 
-### Prerequisites
+## 🏗️ Wie es funktioniert (Architektur)
 
-- **Node.js** (v20+)
-- **Rust** (v1.80+) & **Tauri v2 CLI** (`cargo install tauri-cli`)
+Cody Loom basiert auf einem modernen **Hybrid-Stack**:
+
+1.  **Backend (Rust + Tauri)**: 
+    *   Die Performance-kritischen Aufgaben und System-Interaktionen werden in **Rust** ausgeführt.
+    *   Tauri bietet eine sichere Bridge, um lokale CLI-Tools (wie `mvn` oder `docker`) aufzurufen und das Filesystem zu steuern.
+2.  **Frontend (Angular + Material Design)**:
+    *   Ein reaktives Interface sorgt für eine intuitive Bedienung.
+    *   Echtzeit-Feedback bei Scans und Generierungen.
+3.  **Cross-App Communication**:
+    *   Der Rust-Kern kommuniziert asynchron mit Web-APIs (OSV, Maven Central), um die UI niemals zu blockieren.
+
+---
+
+## 🛠️ Voraussetzungen
+
+Damit alle Funktionen reibungslos laufen, sollten folgende Tools installiert sein:
+
+*   **Docker Desktop**: Erforderlich für die Liquibase-Konvertierung (für temporäre DB-Instanzen).
+*   **Maven (mvn)**: Muss im System-PATH sein, um transitive Abhängigkeiten zu analysieren.
+*   **Liquibase CLI**: Für die Generierung der ChangeLogs.
+
+---
+
+## 💻 Entwicklung & Build
 
 ### Setup
 
 1.  **Repository klonen**
-    ```bash
-    git clone <repository-url>
-    cd eit-cody-loom
-    ```
-
-2.  **Dependencies installieren**
+2.  **Frontend-Dependencies**:
     ```bash
     cd frontend
     npm install
     ```
 
-## Usage
+### Ausführen
 
-### Development Mode
-
-Startet das Angular-Frontend und den Tauri-Backend-Prozess mit Hot-Reload:
-
+**Development Mode**: (Frontend & Backend parallel)
 ```bash
 cd frontend
 npm run tauri dev
 ```
 
-### Build für Production
-
-Erzeugt die ausführbare Binary (`.exe` auf Windows):
-
+**Build für Production**:
 ```bash
 cd frontend
 npm run tauri build
 ```
+Die fertige `.exe` (oder das entsprechende OS-Paket) findest man anschließend unter `src-tauri/target/release/bundle/`.
 
-Die Binary befindet sich unter `src-tauri/target/release/bundle/`.
+---
+
+*Entwickelt für effiziente Cloud-Native Java Workflows.* 🚀
